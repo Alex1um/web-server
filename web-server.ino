@@ -110,6 +110,7 @@
 #define MOTOR_1_PIN_2    15
 #define MOTOR_2_PIN_1    13
 #define MOTOR_2_PIN_2    12
+#define LED_PIN 33
 
 WebServer server(80);
 
@@ -167,6 +168,15 @@ void go(String dir) {
   }
 }
 
+void led_on() {
+  digitalWrite(LED_PIN, LOW);
+}
+
+
+void led_off() {
+  digitalWrite(LED_PIN, HIGH);
+}
+
 void action() {
   String direction;
   String uri = server.uri();
@@ -209,9 +219,11 @@ void setup()
     server.on("/go/left", action);
     server.on("/go/right", action);
     server.on("/go/stop", action);
+    server.on("/led/on", led_on);
+    server.on("/led/off", led_off);
     server.begin();
     Serial.println("HTTP server started");    
-
+    pinMode(LED_PIN, OUTPUT);
 }
 
 void loop()
