@@ -147,6 +147,8 @@ void action() {
         rot_sens_right(cnt);
       }
       stop();
+    } else {
+      go(dest);
     }
   } else {
     stop();
@@ -187,7 +189,7 @@ void get_accel() {
   server.send(200, "application/json", tmp);
 }
 
-void rot_sens_left(float cnt) {
+void rot_sens_right(float cnt) {
   float filtVal = 0.;
   while (filtVal < cnt) {
     Sensor.gyroUpdate();
@@ -198,7 +200,7 @@ void rot_sens_left(float cnt) {
   stop();
 }
 
-void rot_sens_right(float cnt) {
+void rot_sens_left(float cnt) {
   float filtVal = 0.;
   cnt = -cnt;
   while (cnt < filtVal) {
