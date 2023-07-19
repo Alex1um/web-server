@@ -2,7 +2,6 @@
 #include <WebServer.h>
 #include <Wire.h>
 #include <MPU9250_asukiaaa.h>
-// #include <CircularBuffer.h>
 
 #define ESP_MODEL_WROOM
 #if defined(CAMERA_MODEL_AI_THINKER)
@@ -41,14 +40,14 @@ void go_forward() {
   digitalWrite(MOTOR_2_PIN_2, 0);
 }
 
-void go_left() {
+void go_right() {
   digitalWrite(MOTOR_1_PIN_1, 0);
   digitalWrite(MOTOR_1_PIN_2, 1);
   digitalWrite(MOTOR_2_PIN_1, 1);
   digitalWrite(MOTOR_2_PIN_2, 0);
 }
 
-void go_right() {
+void go_left() {
   digitalWrite(MOTOR_1_PIN_1, 1);
   digitalWrite(MOTOR_1_PIN_2, 0);
   digitalWrite(MOTOR_2_PIN_1, 0);
@@ -91,35 +90,8 @@ void led_off() {
   digitalWrite(LED_PIN, LED_LOW);
 }
 
-// struct AccelData {
-//   float x;
-//   float y;
-//   float z;
-//   float sqrt;
-// };
-
-// CircularBuffer<AccelData, 10> accelBuf;
-
-// uint32_t listen(uint32_t time) {
-//   unsigned long start = millis();
-//   accelBuf.clear();
-//   while (millis() - start < time) {
-//     Sensor.accelUpdate();
-//     accelBuf.push(
-//       AccelData{ 
-//         .x=Sensor.accelX(),
-//         .y=Sensor.accelY(),
-//         .z=Sensor.accelZ(),
-//         .sqrt=Sensor.accelSqrt(),
-//       }
-//     );
-
-//   }
-//   return 0;
-// }
-
-float filtVal = 0.;
 uint32_t listen(uint32_t time) {
+  float filtVal = 0.;
   unsigned long start = millis();
   while (millis() - start < time) {
     Sensor.accelUpdate();
@@ -130,23 +102,54 @@ uint32_t listen(uint32_t time) {
   return 200;
 }
 
+// dir = 1 - right
+uint32_t listen_rot(uint32_t time) {
+  float filtVal = 0.;
+  unsigned long start = millis();
+  while (millis() - start < time) {
+    Sensor.gyroUpdate();
+    float newVal = Sensor.gyroZ();
+    filtVal += newVal;
+  }
+  return filtVal;
+}
+
 void action() {
   String direction;
   String uri = server.uri();
   String dest = uri.substring(uri.lastIndexOf("/") + 1);
-  Serial.println(server.uri());
-  Serial.println(server.args());
-  bool is_delayed = server.argName(0).equals("delay") && !dest.equals("stop");
-  go(dest);
-  if (is_delayed) {
-    int code = 200;
-    if (dest == "left" || dest == "right") {
-      delay(server.arg(0).toInt());
-    } else {
-      code = listen(server.arg(0).toInt());
+  Serial.println(dest);
+  if (!dest.equals("stop")) {
+    if (server.argName(0).equals("delay")) {
+      int code = 200;
+      // char cont[20];
+      if (dest == "left" || dest == "right") {
+        go(dest);
+        delay(server.arg(0).toInt());
+        // float filt = listen_rot(server.arg(0).toInt());
+        // sprintf(cont, "%f", filt);
+        // cont[19] = '\0';
+      } else {
+        go(dest);
+        code = listen(server.arg(0).toInt());
+      }
+      stop();
+      // server.send(code, "text/plain", cont);
+      server.send(code);
+    } else if (server.argName(0).equals("sensor")) {
+      // float cnt = listen_rot(server.arg(0).toFloat());
+      float cnt = server.arg(0).toFloat();
+      if (dest == "left") {
+        go(dest);
+        rot_sens_left(cnt);
+      } else if (dest == "right") {
+        go(dest);
+        rot_sens_right(cnt);
+      }
+      stop();
     }
+  } else {
     stop();
-    server.send(code);
   }
 }
 
@@ -182,6 +185,29 @@ void get_accel() {
   Sensor.accelZ(), 
   Sensor.accelSqrt());
   server.send(200, "application/json", tmp);
+}
+
+void rot_sens_left(float cnt) {
+  float filtVal = 0.;
+  while (filtVal < cnt) {
+    Sensor.gyroUpdate();
+    // float newVal = (Sensor.gyroZ() - filtVal) * .1;
+    float newVal = Sensor.gyroZ();
+    filtVal += newVal;
+  }
+  stop();
+}
+
+void rot_sens_right(float cnt) {
+  float filtVal = 0.;
+  cnt = -cnt;
+  while (cnt < filtVal) {
+    Sensor.gyroUpdate();
+    // float newVal = (Sensor.gyroZ() - filtVal) * .1;
+    float newVal = Sensor.gyroZ();
+    filtVal += newVal;
+  }
+  stop();
 }
 
 void setup()
@@ -231,11 +257,5 @@ void setup()
 void loop()
 {
   server.handleClient();
-  delay(2);//allow the cpu to switch to other tasks
-}
-
-void yield()
-{
-  server.handleClient();
-  delay(2);//allow the cpu to switch to other tasks
+  delay(5);//allow the cpu to switch to other tasks
 }
